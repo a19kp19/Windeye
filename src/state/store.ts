@@ -39,6 +39,8 @@ interface State {
   running: boolean;
   metrics: Metrics | null;
   status: SimStatus;
+  /** One-off message for the status strip, e.g. a share link that couldn't be opened. */
+  notice: string | null;
   /** Increments to ask the canvas to re-fit the plan into view. */
   fitSeq: number;
   /** Increments when the worker publishes a new raster (rooms, façade pressures). */
@@ -60,6 +62,7 @@ interface State {
   setRunning: (r: boolean) => void;
   setMetrics: (m: Metrics | null) => void;
   setStatus: (s: Partial<SimStatus>) => void;
+  setNotice: (n: string | null) => void;
   requestFit: () => void;
   bumpRaster: () => void;
 }
@@ -86,6 +89,7 @@ export const useStore = create<State>((set, get) => ({
   running: true,
   metrics: null,
   status: { simTime: 0, tracerTime: 0, stepsPerSec: 0, cells: 0, dx: 0, error: null },
+  notice: null,
   fitSeq: 0,
   rasterSeq: 0,
 
@@ -144,6 +148,7 @@ export const useStore = create<State>((set, get) => ({
   setRunning: (running) => set({ running }),
   setMetrics: (metrics) => set({ metrics }),
   setStatus: (s) => set((st) => ({ status: { ...st.status, ...s } })),
+  setNotice: (notice) => set({ notice }),
   requestFit: () => set((s) => ({ fitSeq: s.fitSeq + 1 })),
   bumpRaster: () => set((s) => ({ rasterSeq: s.rasterSeq + 1 })),
 }));

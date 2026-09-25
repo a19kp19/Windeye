@@ -14,6 +14,7 @@ export function StatusStrip({ onResetClock }: { onResetClock: () => void }) {
   const tracerSpeed = useStore((s) => s.tracerSpeed);
   const setTracerSpeed = useStore((s) => s.setTracerSpeed);
   const status = useStore((s) => s.status);
+  const notice = useStore((s) => s.notice);
   const [, force] = useState(0);
   useEffect(() => {
     const t = setInterval(() => force((x) => x + 1), 500);
@@ -59,6 +60,10 @@ export function StatusStrip({ onResetClock }: { onResetClock: () => void }) {
       <span className="st-item grow" />
       {status.error ? (
         <span className="st-item err">{status.error}</span>
+      ) : notice ? (
+        <span className="st-item err" role="alert">
+          {notice}
+        </span>
       ) : (
         <span className="st-item">
           <i>lattice</i> {status.cells ? `${(status.cells / 1000).toFixed(0)}k cells` : "…"}

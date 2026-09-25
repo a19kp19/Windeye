@@ -76,13 +76,22 @@ export function usePersistence() {
     let cancelled = false;
     (async () => {
       const m = /[#&]p=([A-Za-z0-9_-]+)/.exec(window.location.hash);
-      const saved = m ? await decodeShare(m[1]) : loadLocal();
-      if (cancelled || !saved) return;
+      const shared = m ? await decodeShare(m[1]) : null;
+      if (cancelled) return;
       const st = useStore.getState();
+      if (m) {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+        if (!shared) {
+          st.setNotice("That share link is damaged or incomplete, so it couldn't be opened.");
+          setTimeout(() => useStore.getState().setNotice(null), 10000);
+        }
+      }
+      // A bad link falls back to the autosave rather than leaving it to be overwritten by the template.
+      const saved = shared ?? loadLocal();
+      if (!saved) return;
       st.replacePlan(saved.plan, saved.templateId);
       st.setWeather(saved.weather);
       useStore.setState({ past: [] });
-      if (m) history.replaceState(null, "", window.location.pathname + window.location.search);
     })();
     let t: ReturnType<typeof setTimeout> | undefined;
     const unsub = useStore.subscribe((s, prev) => {
