@@ -21,7 +21,6 @@ export function useSimulation() {
   useEffect(() => {
     const worker = new Worker(new URL("./sim.worker.ts", import.meta.url), { type: "module" });
     workerRef.current = worker;
-    const send = (m: ToWorker) => worker.postMessage(m);
     worker.onmessage = (e: MessageEvent<FromWorker>) => {
       const msg = e.data;
       const st = useStore.getState();
@@ -43,7 +42,11 @@ export function useSimulation() {
           live.tracerTime = msg.tracerTime;
           live.stepsPerSec = msg.stepsPerSec;
           live.frameSeq++;
-          if (old.length) send({ type: "recycle", buffers: old.map((a) => a.buffer as ArrayBuffer) });
+          if (old.length) {
+            // Transfer (not copy) the previous frame's buffers back so the worker can reuse them.
+            const buffers = old.map((a) => a.buffer as ArrayBuffer).filter((b) => b.byteLength > 0);
+            worker.postMessage({ type: "recycle", buffers } satisfies ToWorker, buffers);
+          }
           break;
         }
         case "metrics": {

@@ -115,7 +115,7 @@ function WindowSymbol({
   const tipA = add(add(span.a, faceIn), scale(leafDirA, leaf));
   const tipB = add(add(span.b, faceIn), scale(leafDirB, leaf));
   return (
-    <g className={cls}>
+    <g className={cls} data-id={o.id}>
       <polygon
         className="opening-hit"
         points={pts([add(span.a, faceIn), add(span.b, faceIn), add(span.b, faceOut), add(span.a, faceOut)])}
@@ -186,7 +186,7 @@ function DoorSymbol({ w, o, selected }: { w: Wall; o: Opening; selected: boolean
   const cls = `opening door state-${o.state}${o.passage ? " passage" : ""}${selected ? " is-selected" : ""}`;
   const sweep = (hingeAtA ? 1 : -1) * (o.swing ?? 1) * (d.x * n.y - d.y * n.x) > 0 ? 1 : 0;
   return (
-    <g className={cls}>
+    <g className={cls} data-id={o.id}>
       <polygon
         className="opening-hit"
         points={pts([
@@ -233,6 +233,7 @@ function FanSymbol({ f, selected }: { f: Fan; selected: boolean }) {
   return (
     <g
       className={`fan ${f.on ? "is-on" : "is-off"}${selected ? " is-selected" : ""}`}
+      data-id={f.id}
       transform={`translate(${f.pos.x} ${f.pos.y}) rotate(${deg})`}
     >
       <rect className="fan-body" x={-0.13} y={-s / 2} width={0.26} height={s} />
@@ -266,7 +267,10 @@ function FurnitureShape({ f, selected, pxPerM }: { f: Furniture; selected: boole
   const deg = ((f.angle * 180) / Math.PI) % 180;
   const textDeg = Math.abs(deg) > 90 ? deg - 180 : deg;
   return (
-    <g className={`furniture kind-${f.kind}${tall ? " tall" : ""}${selected ? " is-selected" : ""}`}>
+    <g
+      className={`furniture kind-${f.kind}${tall ? " tall" : ""}${selected ? " is-selected" : ""}`}
+      data-id={f.id}
+    >
       <polygon points={pts(c)} />
       {tall && (
         <>

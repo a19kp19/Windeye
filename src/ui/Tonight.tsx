@@ -107,47 +107,51 @@ export function Tonight() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: setupKey captures the parts of plan/weather that matter
   useEffect(() => {
     if (!hours.length || !live.raster) return;
-    const dirs = [...new Set(hours.map((h) => Math.round(h.windDir / 45) % 8))];
-    const fansOn = plan.fans.some((f) => f.on);
-    pool.current?.dispose();
-    const p = new OptPool();
-    pool.current = p;
-    setAch(null);
-    let done = 0;
-    const total = dirs.length + (fansOn ? 1 : 0);
-    setMsg(`Simulating your home in tonight's winds (0/${total})…`);
-    const byDir: Record<number, number> = {};
-    let calm = 1.2;
-    const jobs = dirs.map((d) =>
-      p
-        .run({
-          id: `d${d}`,
-          plan,
-          weather: { ...weather, windFromDeg: d * 45, windSpeed: REF_WIND },
-          targetCells: 8000,
-        })
-        .then((r) => {
-          byDir[d] = r.metrics.home.ach;
-          setMsg(`Simulating your home in tonight's winds (${++done}/${total})…`);
-        }),
-    );
-    if (fansOn) {
-      jobs.push(
-        p.run({ id: "calm", plan, weather: { ...weather, windSpeed: 0 }, targetCells: 8000 }).then((r) => {
-          calm = Math.max(calm, r.metrics.home.ach);
-          setMsg(`Simulating your home in tonight's winds (${++done}/${total})…`);
-        }),
+    // Debounced: clicking through windows shouldn't launch a batch of simulations per click.
+    const timer = setTimeout(() => {
+      const dirs = [...new Set(hours.map((h) => Math.round(h.windDir / 45) % 8))];
+      const fansOn = plan.fans.some((f) => f.on);
+      pool.current?.dispose();
+      const p = new OptPool();
+      pool.current = p;
+      setAch(null);
+      let done = 0;
+      const total = dirs.length + (fansOn ? 1 : 0);
+      setMsg(`Simulating your home in tonight's winds (0/${total})…`);
+      const byDir: Record<number, number> = {};
+      let calm = 1.2;
+      const jobs = dirs.map((d) =>
+        p
+          .run({
+            id: `d${d}`,
+            plan,
+            weather: { ...weather, windFromDeg: d * 45, windSpeed: REF_WIND },
+            targetCells: 8000,
+          })
+          .then((r) => {
+            byDir[d] = r.metrics.home.ach;
+            setMsg(`Simulating your home in tonight's winds (${++done}/${total})…`);
+          }),
       );
-    }
-    Promise.all(jobs)
-      .then(() => {
-        if (pool.current !== p) return;
-        setAch({ byDir, calm, key: setupKey });
-        setMsg(null);
-        p.dispose();
-        pool.current = null;
-      })
-      .catch(() => {});
+      if (fansOn) {
+        jobs.push(
+          p.run({ id: "calm", plan, weather: { ...weather, windSpeed: 0 }, targetCells: 8000 }).then((r) => {
+            calm = Math.max(calm, r.metrics.home.ach);
+            setMsg(`Simulating your home in tonight's winds (${++done}/${total})…`);
+          }),
+        );
+      }
+      Promise.all(jobs)
+        .then(() => {
+          if (pool.current !== p) return;
+          setAch({ byDir, calm, key: setupKey });
+          setMsg(null);
+          p.dispose();
+          pool.current = null;
+        })
+        .catch(() => {});
+    }, 900);
+    return () => clearTimeout(timer);
   }, [hours, setupKey]);
 
   const night = useMemo(() => {
