@@ -5,14 +5,10 @@ export default defineConfig({
   plugins: [react()],
   base: "./",
   worker: { format: "es" },
-  server: {
-    host: "0.0.0.0",
-    port: 5173,
-    strictPort: true,
-    // The managed preview is served through a proxy hostname.
-    allowedHosts: true,
-  },
-  preview: { host: "0.0.0.0", port: 4173, allowedHosts: true },
+  // Keep Vite's defaults: localhost only, Host header checked. The managed preview passes --host itself
+  // and allow-lists its proxy domain through __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS.
+  server: { port: 5173, strictPort: true },
+  preview: { port: 4173 },
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
