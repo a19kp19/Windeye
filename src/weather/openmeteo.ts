@@ -49,11 +49,20 @@ export async function fetchForecast(lat: number, lon: number, signal?: AbortSign
       wind_direction_10m: number[];
     };
   };
+  const h = j.hourly;
+  // Hours the API has no data for come back as null; keep the series up to the first gap.
+  let n = 0;
+  while (
+    n < h.time.length &&
+    [h.temperature_2m[n], h.wind_speed_10m[n], h.wind_direction_10m[n]].every((v) => Number.isFinite(v))
+  )
+    n++;
+  if (n === 0) throw new Error("no forecast data for this place");
   return {
-    times: j.hourly.time,
-    temp: j.hourly.temperature_2m,
-    windSpeed: j.hourly.wind_speed_10m,
-    windDir: j.hourly.wind_direction_10m,
+    times: h.time.slice(0, n),
+    temp: h.temperature_2m.slice(0, n),
+    windSpeed: h.wind_speed_10m.slice(0, n),
+    windDir: h.wind_direction_10m.slice(0, n),
     utcOffsetSeconds: j.utc_offset_seconds,
     timezone: j.timezone,
   };

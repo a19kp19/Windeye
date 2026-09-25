@@ -23,6 +23,7 @@ export interface PlannedHour extends Hour {
 
 export interface NightPlanOptions {
   indoorStart: number;
+  /** m², must be > 0 (a plan with no enclosed room has nothing to model). */
   floorArea: number;
   ceiling: number;
   mass: Mass;
@@ -48,23 +49,24 @@ export function planNight(hours: Hour[], achFor: (h: Hour) => number, o: NightPl
   const Henv = (o.envelope ?? 1.1) * o.floorArea;
   const gains = (o.gains ?? 4) * o.floorArea;
   const air = 1.2 * 1005; // ρ·c_p of air, J/(m³·K)
+  const Hshut = (air * 0.35 * V) / 3600 + Henv; // shut: infiltration only
+  /** One hour of C·dT/dt = H·(tOut − T) + gains, solved exactly (explicit steps blow up at high ACH). */
+  const hour = (t: number, tOut: number, H: number) => {
+    const tEq = tOut + gains / H;
+    return tEq + (t - tEq) * Math.exp((-H * 3600) / C);
+  };
   let tIn = o.indoorStart;
   let tShut = o.indoorStart;
   let open = false;
   const out: PlannedHour[] = [];
-  const SUB = 12;
   for (const h of hours) {
     // Hysteresis: open once outside is clearly cooler; close when it no longer helps.
     if (!open && h.temp < tIn - 0.8 && tIn > o.floorTemp + 0.3) open = true;
     else if (open && (h.temp > tIn - 0.2 || tIn <= o.floorTemp)) open = false;
-    const ach = open ? achFor(h) : 0.35; // shut: infiltration only
-    const Hve = (air * ach * V) / 3600;
+    const ach = open ? achFor(h) : 0.35;
     out.push({ ...h, indoor: tIn, indoorShut: tShut, open, ach });
-    const dt = 3600 / SUB;
-    for (let s = 0; s < SUB; s++) {
-      tIn += (dt * ((Hve + Henv) * (h.temp - tIn) + gains)) / C;
-      tShut += (dt * (((air * 0.35 * V) / 3600 + Henv) * (h.temp - tShut) + gains)) / C;
-    }
+    tIn = hour(tIn, h.temp, (air * ach * V) / 3600 + Henv);
+    tShut = hour(tShut, h.temp, Hshut);
   }
   const windows: { from: number; to: number }[] = [];
   out.forEach((h, i) => {

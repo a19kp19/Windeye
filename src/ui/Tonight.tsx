@@ -104,9 +104,20 @@ export function Tonight() {
     plan.northDeg,
     weather.exposure,
   ]);
+  // From the live metrics, so the effect below re-runs once the first room gets closed off.
+  const hasRooms = (metrics?.rooms.length ?? 0) > 0;
+  const noRooms = metrics !== null && metrics.rooms.length === 0;
   // biome-ignore lint/correctness/useExhaustiveDependencies: setupKey captures the parts of plan/weather that matter
   useEffect(() => {
     if (!hours.length || !live.raster) return;
+    if (!hasRooms) {
+      // No enclosed room means no indoor air to simulate or floor area to heat.
+      pool.current?.dispose();
+      pool.current = null;
+      setAch(null);
+      setMsg(null);
+      return;
+    }
     // Debounced: clicking through windows shouldn't launch a batch of simulations per click.
     const timer = setTimeout(() => {
       const dirs = [...new Set(hours.map((h) => Math.round(h.windDir / 45) % 8))];
@@ -152,10 +163,10 @@ export function Tonight() {
         .catch(() => {});
     }, 900);
     return () => clearTimeout(timer);
-  }, [hours, setupKey]);
+  }, [hours, setupKey, hasRooms]);
 
   const night = useMemo(() => {
-    if (!hours.length || !ach || !live.raster) return null;
+    if (!hours.length || !ach || !hasRooms || !live.raster || live.raster.indoorArea <= 0) return null;
     return planNight(
       hours,
       (h) => {
@@ -164,7 +175,7 @@ export function Tonight() {
       },
       { indoorStart: indoor, floorArea: live.raster.indoorArea, ceiling: plan.ceiling, mass, floorTemp: 20 },
     );
-  }, [hours, ach, indoor, mass, plan.ceiling, metrics]);
+  }, [hours, ach, hasRooms, indoor, mass, plan.ceiling, metrics]);
 
   const search = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,6 +300,11 @@ export function Tonight() {
         </div>
       )}
       {msg && <p className="muted small">{msg}</p>}
+      {hours.length > 0 && noRooms && (
+        <p className="muted small">
+          Close off a room — walls all the way round — and Windeye will plan the night for it.
+        </p>
+      )}
       {!place && !msg && (
         <p className="muted small">
           Pick your town to get tonight's hour-by-hour plan: when it's worth opening up, with which wind, and

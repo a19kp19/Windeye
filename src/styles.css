@@ -1511,6 +1511,35 @@ button.primary:disabled {
 .credit a:hover {
   color: var(--fresh);
 }
+.crash {
+  max-width: 34rem;
+  margin: 14vh auto;
+  padding: 28px 32px;
+  border: 1px solid var(--ink);
+  background: var(--paper-hi);
+  display: grid;
+  gap: 10px;
+}
+.crash h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 40px;
+}
+.crash p {
+  margin: 0;
+}
+.crash-detail {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--alert);
+  overflow-wrap: anywhere;
+}
+.crash-actions {
+  display: flex;
+  gap: 8px;
+}
 
 @media (max-width: 1180px) {
   .workspace {

@@ -185,3 +185,12 @@ export function loadLocal(): Loaded | null {
     return null;
   }
 }
+
+/** Forget the autosaved plan, e.g. to recover from one that crashes the app. */
+export function clearLocal() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // Storage unavailable: nothing was saved.
+  }
+}

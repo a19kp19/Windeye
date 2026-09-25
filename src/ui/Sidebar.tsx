@@ -258,7 +258,7 @@ export function ReportPanel() {
               <span>outdoor air in</span>
             </div>
             <div>
-              <b>{formatAge(metrics.home.meanAge)}</b>
+              <b>{metrics.rooms.length ? formatAge(metrics.home.meanAge) : "—"}</b>
               <span>mean air age</span>
             </div>
           </div>

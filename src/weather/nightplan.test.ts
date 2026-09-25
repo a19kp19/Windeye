@@ -36,6 +36,23 @@ describe("night plan", () => {
     });
     expect(plan.windows).toEqual([]);
   });
+
+  it("stays physical at any ventilation rate", () => {
+    // A small, light home with a huge draught: explicit time steps used to reach 180,000 °C here.
+    for (const ach of [12, 800, 1500, 5000]) {
+      const plan = planNight(hours([30, 26, 22, 19, 18, 18, 20, 24]), () => ach, {
+        indoorStart: 28,
+        floorArea: 12,
+        ceiling: 2.6,
+        mass: "light",
+        floorTemp: 20,
+      });
+      for (const h of plan.hours) {
+        expect(h.indoor).toBeGreaterThan(17.5);
+        expect(h.indoor).toBeLessThan(30.5);
+      }
+    }
+  });
 });
 
 describe("forecast hour alignment", () => {
