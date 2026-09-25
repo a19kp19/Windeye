@@ -292,7 +292,7 @@ export function Tonight() {
       {!place && !msg && (
         <p className="muted small">
           Pick your town to get tonight's hour-by-hour plan: when it's worth opening up, with which wind, and
-          how cool it'll get by morning. Forecast from Open-Meteo.
+          how cool it'll get by morning.
         </p>
       )}
       {hours.length > 0 && (
@@ -398,6 +398,12 @@ export function Tonight() {
           )}
         </p>
       )}
+      {/* Open-Meteo's CC BY 4.0 terms ask for this link wherever its data is shown. */}
+      <p className="credit">
+        <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">
+          Weather data by Open-Meteo.com
+        </a>
+      </p>
     </section>
   );
 }

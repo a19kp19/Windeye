@@ -1498,6 +1498,19 @@ button.primary:disabled {
 .verdict b {
   font-weight: 600;
 }
+.credit {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--graphite);
+}
+.credit a {
+  color: inherit;
+  text-underline-offset: 2px;
+}
+.credit a:hover {
+  color: var(--fresh);
+}
 
 @media (max-width: 1180px) {
   .workspace {
