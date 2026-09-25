@@ -47,9 +47,11 @@ export function WindBadge({
   const R = (Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 2) * view.scale;
   const toward = bearingToPlan(weather.windFromDeg + 180, plan.northDeg);
   const calm = weather.windSpeed < 0.3;
-  const pad = 64;
-  const ax = Math.min(width - pad, Math.max(pad, c.x - toward.x * (R + 58)));
-  const ay = Math.min(height - pad, Math.max(pad, c.y - toward.y * (R + 58)));
+  // Horizontal margin covers half the centred "≈ 12.0 m/s at the façade" label (~137 px).
+  const padX = 76;
+  const padY = 64;
+  const ax = Math.min(width - padX, Math.max(padX, c.x - toward.x * (R + 58)));
+  const ay = Math.min(height - padY, Math.max(padY, c.y - toward.y * (R + 58)));
   const ang = (Math.atan2(toward.y, toward.x) * 180) / Math.PI;
   const facade = weather.windSpeed * EXPOSURE_FACTOR[weather.exposure];
   const northAng = plan.northDeg;
