@@ -1,3 +1,4 @@
+import { AGE_CAP } from "./age";
 import { coolingEffect } from "./comfort";
 import type { Raster } from "./raster";
 
@@ -5,7 +6,7 @@ export interface RoomMetric {
   index: number;
   name: string;
   area: number;
-  /** Mean age of the room's air (s). */
+  /** Mean age of the room's air (s); Infinity when no outside air can reach it. */
   meanAge: number;
   /** Effective air changes per hour ≈ 3600 / mean age. */
   ach: number;
@@ -34,8 +35,10 @@ export interface HomeMetric {
   volume: number;
   /** Nominal whole-home air changes per hour (outdoor air / volume). */
   ach: number;
-  /** Volume-weighted mean age (s). */
+  /** Volume-weighted mean age (s) of the rooms outside air reaches; Infinity if none. */
   meanAge: number;
+  /** Floor-area share of the rooms that outside air reaches at all (0..1). */
+  ventilatedShare: number;
   /** Minutes until ~95 % of the air is replaced, assuming the rooms mix (3 × mean age). */
   flushMinutes: number;
 }
@@ -60,6 +63,7 @@ export function computeMetrics(
   const { room, grid } = r;
   const nRooms = r.rooms.length;
   const ageSum = new Float64Array(nRooms);
+  const ageCount = new Float64Array(nRooms);
   const freshSum = new Float64Array(nRooms);
   const speedSum = new Float64Array(nRooms);
   const count = new Float64Array(nRooms);
@@ -67,14 +71,21 @@ export function computeMetrics(
   for (let c = 0; c < n; c++) {
     const k = room[c];
     if (k < 0) continue;
-    ageSum[k] += fields.tau[c];
+    // Capped cells are sealed off; average only air that is actually exchanged.
+    if (fields.tau[c] < AGE_CAP) {
+      ageSum[k] += fields.tau[c];
+      ageCount[k] += 1;
+    }
     freshSum[k] += fields.fresh[c];
     speedSum[k] += Math.hypot(fields.ux[c], fields.uy[c]);
     count[k] += 1;
   }
   const rooms: RoomMetric[] = r.rooms.map((ri) => {
     const cnt = Math.max(1, count[ri.index]);
-    const meanAge = (ageSum[ri.index] / cnt) * dt;
+    const meanAge =
+      count[ri.index] > 0 && ageCount[ri.index] === 0
+        ? Number.POSITIVE_INFINITY
+        : (ageSum[ri.index] / Math.max(1, ageCount[ri.index])) * dt;
     return {
       index: ri.index,
       name: ri.name,
@@ -106,11 +117,14 @@ export function computeMetrics(
   const volume = r.indoorArea * H;
   let ageW = 0;
   let areaW = 0;
+  let areaAll = 0;
   for (const rm of rooms) {
+    areaAll += rm.area;
+    if (!Number.isFinite(rm.meanAge)) continue;
     ageW += rm.meanAge * rm.area;
     areaW += rm.area;
   }
-  const meanAge = areaW > 0 ? ageW / areaW : 0;
+  const meanAge = areaW > 0 ? ageW / areaW : areaAll > 0 ? Number.POSITIVE_INFINITY : 0;
   return {
     rooms,
     openings,
@@ -120,6 +134,7 @@ export function computeMetrics(
       volume,
       ach: volume > 0 ? inflow / volume : 0,
       meanAge,
+      ventilatedShare: areaAll > 0 ? areaW / areaAll : 0,
       flushMinutes: (3 * meanAge) / 60,
     },
   };

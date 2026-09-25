@@ -39,6 +39,7 @@ export function configure(
   open: Set<string>,
   fan: Candidate["fan"],
 ): Plan {
+  const party = new Set(plan.walls.filter((w) => w.kind === "party").map((w) => w.id));
   const openings = plan.openings.map((o) => {
     const f = facts.get(o.id);
     if (!f) return o;
@@ -46,7 +47,8 @@ export function configure(
       // Doors to the outside only open if chosen; party-wall doors are never "exterior".
       return { ...o, state: open.has(o.id) ? ("open" as const) : ("closed" as const) };
     }
-    return o.kind === "door" ? { ...o, state: "open" as const } : o;
+    // Open doors between rooms; leave the front door to the building corridor as it is.
+    return o.kind === "door" && !party.has(o.wallId) ? { ...o, state: "open" as const } : o;
   });
   const fans = plan.fans.map((f) => ({ ...f, on: false }));
   if (fan) {
@@ -141,7 +143,7 @@ export function fanCandidates(
   best.forEach((c, bi) => {
     for (const id of c.open) {
       const o = plan.openings.find((x) => x.id === id);
-      if (!o || o.kind !== "window") continue;
+      if (o?.kind !== "window") continue;
       for (const dirOut of [true, false]) {
         const fan = { openingId: id, out: dirOut };
         out.push({
@@ -165,22 +167,31 @@ export function fanCandidates(
 }
 
 /**
- * Higher is better. Each window beyond two costs 7 %, so a sharp two-window cross-draught can beat
- * "open everything" — the useful answer is usually the minimal setup that works.
+ * Effort discount. Each window beyond two costs 7 % (a fan 3 %), so a sharp two-window cross-draught
+ * can beat "open everything" — the useful answer is usually the minimal setup that works.
  */
-export function score(goal: Goal, m: Metrics, c: Candidate, comfortRooms: Record<string, string>): number {
-  const penalty = Math.max(0.4, 1 - 0.07 * Math.max(0, c.open.length - 2) - (c.fan ? 0.03 : 0));
-  if (goal.kind === "flush") {
-    const effAch = m.home.meanAge > 0 ? 3600 / m.home.meanAge : 0;
-    return effAch * penalty;
-  }
+export function effort(c: Candidate): number {
+  return Math.max(0.4, 1 - 0.07 * Math.max(0, c.open.length - 2) - (c.fan ? 0.03 : 0));
+}
+
+/**
+ * What the goal is after, undiscounted: effective air changes/h (scaled by the share of the home
+ * that gets any air), or the room's ACH/10 + 2 × °C of breeze cooling.
+ */
+export function benefit(goal: Goal, m: Metrics, comfortRooms: Record<string, string>): number {
+  if (goal.kind === "flush") return m.home.meanAge > 0 ? (3600 / m.home.meanAge) * m.home.ventilatedShare : 0;
   const room = m.rooms.find((r) => r.name === goal.room);
   const roomAch = room && room.meanAge > 0 ? 3600 / room.meanAge : 0;
   const cooling = Math.max(
     0,
     ...m.comfort.filter((s) => comfortRooms[s.id] === goal.room).map((s) => s.cooling),
   );
-  return (roomAch / 10 + 2 * cooling) * penalty;
+  return roomAch / 10 + 2 * cooling;
+}
+
+/** Ranking score, higher is better. */
+export function score(goal: Goal, m: Metrics, c: Candidate, comfortRooms: Record<string, string>): number {
+  return benefit(goal, m, comfortRooms) * effort(c);
 }
 
 /** Keep the best-scoring candidate per window set, best first. */

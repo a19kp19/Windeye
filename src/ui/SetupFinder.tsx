@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { OptPool } from "../sim/optClient";
 import {
+  benefit,
   type Candidate,
   describe,
   distinctByWindows,
@@ -124,6 +125,28 @@ export function SetupFinder() {
     setRun((r) => ({ ...r, phase: r.results.length ? "done" : "idle" }));
   };
 
+  // Results answer one question; a different goal or fan choice needs a fresh search.
+  const reset = () => {
+    pool.current?.dispose();
+    pool.current = null;
+    setRun(IDLE);
+  };
+  const chooseGoal = (g: Goal) => {
+    if (JSON.stringify(g) === JSON.stringify(goal)) return;
+    setGoal(g);
+    reset();
+  };
+
+  const gainLabel = (ev: Evaluation) => {
+    if (!run.baseline) return null;
+    const now = benefit(goal, run.baseline.metrics, run.baseline.comfortRooms);
+    const g = benefit(goal, ev.metrics, ev.comfortRooms) / Math.max(1e-9, now);
+    if (g <= 1.05) return null;
+    // A shut home's age is capped, not infinite, so ratios against it are meaningless.
+    if (g >= 50) return "vs. near-stagnant air now";
+    return `${g < 10 ? g.toFixed(1) : Math.round(g)}× better than now`;
+  };
+
   const apply = (ev: Evaluation) => {
     const fans = ev.candidate.plan.fans.map((f) =>
       f.id === "finder-fan" ? { ...f, id: `f${Date.now().toString(36)}` } : f,
@@ -131,8 +154,20 @@ export function SetupFinder() {
     useStore.getState().setPlan(() => ({ ...ev.candidate.plan, fans }));
   };
 
-  const top = distinctByWindows(run.results).slice(0, 4);
   const facts = run.facts;
+  // Two window sets can read the same ("Living room N window" when a room has two); show one.
+  const top: Evaluation[] = [];
+  if (facts) {
+    const seen = new Set<string>();
+    for (const ev of distinctByWindows(run.results)) {
+      const d = describe(ev.candidate, runPlan.current, facts);
+      const key = `${d.open}|${d.fan ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      top.push(ev);
+      if (top.length === 4) break;
+    }
+  }
   const metricLine = (ev: Evaluation) => {
     const m = ev.metrics;
     if (goal.kind === "flush") {
@@ -158,7 +193,7 @@ export function SetupFinder() {
             role="radio"
             aria-checked={goal.kind === "flush"}
             className={goal.kind === "flush" ? "on" : ""}
-            onClick={() => setGoal({ kind: "flush" })}
+            onClick={() => chooseGoal({ kind: "flush" })}
           >
             Air it all out
           </button>
@@ -167,9 +202,10 @@ export function SetupFinder() {
             role="radio"
             aria-checked={goal.kind === "cool"}
             className={goal.kind === "cool" ? "on" : ""}
-            onClick={() =>
-              setGoal({ kind: "cool", room: rooms.find((r) => /bed/i.test(r)) ?? rooms[0] ?? "" })
-            }
+            onClick={() => {
+              if (goal.kind !== "cool")
+                chooseGoal({ kind: "cool", room: rooms.find((r) => /bed/i.test(r)) ?? rooms[0] ?? "" });
+            }}
           >
             Cool one room
           </button>
@@ -177,7 +213,7 @@ export function SetupFinder() {
         {goal.kind === "cool" && (
           <label className="insp-field wide">
             <span>Room</span>
-            <select value={goal.room} onChange={(e) => setGoal({ kind: "cool", room: e.target.value })}>
+            <select value={goal.room} onChange={(e) => chooseGoal({ kind: "cool", room: e.target.value })}>
               {rooms.map((r) => (
                 <option key={r}>{r}</option>
               ))}
@@ -185,7 +221,14 @@ export function SetupFinder() {
           </label>
         )}
         <label className="check">
-          <input type="checkbox" checked={allowFan} onChange={(e) => setAllowFan(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={allowFan}
+            onChange={(e) => {
+              setAllowFan(e.target.checked);
+              reset();
+            }}
+          />
           <span>I have one box fan to place</span>
         </label>
       </div>
@@ -222,30 +265,33 @@ export function SetupFinder() {
         </p>
       )}
       {top.length > 0 && facts && (
-        <ol className="results" data-testid="finder-results">
-          {top.map((ev, i) => {
-            const d = describe(ev.candidate, runPlan.current, facts);
-            const thumb = run.thumbs[ev.candidate.id];
-            const gain = run.baseline ? ev.score / Math.max(1e-6, run.baseline.score) : null;
-            return (
-              <li key={ev.candidate.id}>
-                <span className="rank">{i + 1}</span>
-                {thumb && <Thumb data={thumb} width={112} />}
-                <div className="res-body">
-                  <div className="res-open">Open {d.open}</div>
-                  {d.fan && <div className="res-fan">+ {d.fan}</div>}
-                  <div className="res-metric">{metricLine(ev)}</div>
-                  {gain !== null && gain > 1.05 && (
-                    <div className="res-gain">{gain.toFixed(1)}× better than now</div>
-                  )}
-                </div>
-                <button type="button" onClick={() => apply(ev)} aria-label={`Apply setup ${i + 1}`}>
-                  Apply
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+        <>
+          <p className="muted small">
+            Simplest setup that works comes first: every window beyond two counts against a setup.
+          </p>
+          <ol className="results" data-testid="finder-results">
+            {top.map((ev, i) => {
+              const d = describe(ev.candidate, runPlan.current, facts);
+              const thumb = run.thumbs[ev.candidate.id];
+              const gain = gainLabel(ev);
+              return (
+                <li key={ev.candidate.id}>
+                  <span className="rank">{i + 1}</span>
+                  {thumb && <Thumb data={thumb} width={112} />}
+                  <div className="res-body">
+                    <div className="res-open">Open {d.open}</div>
+                    {d.fan && <div className="res-fan">+ {d.fan}</div>}
+                    <div className="res-metric">{metricLine(ev)}</div>
+                    {gain && <div className="res-gain">{gain}</div>}
+                  </div>
+                  <button type="button" onClick={() => apply(ev)} aria-label={`Apply setup ${i + 1}`}>
+                    Apply
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </>
       )}
       {run.baseline && top.length > 0 && (
         <p className="muted small">Your current setup: {metricLine(run.baseline)}.</p>

@@ -40,7 +40,14 @@ export function solveAge(
   const maxSweeps = opts.maxSweeps ?? 600;
   const tol = opts.tol ?? 2e-4;
   const tau = opts.init && opts.init.length === n ? opts.init : new Float32Array(n);
-  for (let c = 0; c < n; c++) if (solid[c] || outdoor[c]) tau[c] = 0;
+  // Air with no fluid path to outdoors is never replaced (leaks aren't modelled). Sweeping it would
+  // only report a finite age that grows with the sweep count, so pin it at the cap instead.
+  const reach = reachableFromOutdoors(nx, solid, outdoor);
+  for (let c = 0; c < n; c++) {
+    if (solid[c] || outdoor[c]) tau[c] = 0;
+    else if (!reach[c]) tau[c] = AGE_CAP;
+    else if (tau[c] >= AGE_CAP) tau[c] = 0; // sealed in the warm start, opened up since
+  }
 
   let residual = Number.POSITIVE_INFINITY;
   let sweeps = 0;
@@ -102,7 +109,7 @@ export function solveAge(
       for (let ii = 1; ii < nx - 1; ii++) {
         const i = iFwd ? ii : nx - 1 - ii;
         const c = row + i;
-        if (solid[c] || outdoor[c]) continue;
+        if (solid[c] || outdoor[c] || !reach[c]) continue;
         const ch = relax(c);
         if (ch > maxChange) maxChange = ch;
       }
@@ -112,4 +119,27 @@ export function solveAge(
     if (maxChange < tol && sweeps >= 8) break;
   }
   return { tau, sweeps, residual } satisfies AgeResult;
+}
+
+/** Fluid cells joined to an outdoor cell through fluid, 4-connected like the stencil. */
+function reachableFromOutdoors(nx: number, solid: Uint8Array, outdoor: Uint8Array): Uint8Array {
+  const n = solid.length;
+  const reach = new Uint8Array(n);
+  const queue = new Int32Array(n);
+  let tail = 0;
+  const visit = (c: number) => {
+    if (reach[c] || solid[c]) return;
+    reach[c] = 1;
+    queue[tail++] = c;
+  };
+  for (let c = 0; c < n; c++) if (outdoor[c]) visit(c);
+  for (let head = 0; head < tail; head++) {
+    const c = queue[head];
+    const i = c % nx;
+    if (i > 0) visit(c - 1);
+    if (i < nx - 1) visit(c + 1);
+    if (c >= nx) visit(c - nx);
+    if (c < n - nx) visit(c + nx);
+  }
+  return reach;
 }

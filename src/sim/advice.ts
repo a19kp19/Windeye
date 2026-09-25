@@ -46,9 +46,10 @@ export function advise(plan: Plan, m: Metrics, r: RasterSummary): Advice[] {
 
   // Stalest room and the most direct fix.
   const home = m.home;
+  const rank = (age: number) => (Number.isFinite(age) ? age : Number.MAX_VALUE);
   const stale = [...m.rooms]
     .filter((x) => x.area >= 2 && x.meanAge > Math.max(1.8 * home.meanAge, 240))
-    .sort((a, b) => b.meanAge - a.meanAge)[0];
+    .sort((a, b) => rank(b.meanAge) - rank(a.meanAge))[0];
   if (stale) {
     const own = plan.openings.filter((o) => {
       const i = info.get(o.id);
@@ -56,24 +57,27 @@ export function advise(plan: Plan, m: Metrics, r: RasterSummary): Advice[] {
     });
     const shutWindow = own.find((o) => o.kind === "window" && o.state !== "open" && info.get(o.id)?.exterior);
     const shutDoor = own.find((o) => o.kind === "door" && o.state === "closed" && !info.get(o.id)?.exterior);
-    const age = formatAge(stale.meanAge);
+    const sealed = !Number.isFinite(stale.meanAge);
+    const why = sealed ? "no outside air reaches it" : `its air is ${formatAge(stale.meanAge)} old`;
     if (shutWindow) {
       out.push({
         tone: "tip",
-        text: `${stale.name}: its air is ${age} old. Open its window ${shutWindow.state === "tilted" ? "fully" : ""} to give it its own supply.`.replace(
-          "  ",
-          " ",
-        ),
+        text: `${stale.name}: ${why}. Open its window${shutWindow.state === "tilted" ? " fully" : ""} to give it its own supply.`,
       });
     } else if (shutDoor) {
       out.push({
         tone: "tip",
-        text: `${stale.name} is cut off (air age ${age}). Open its door to join it to the breeze.`,
+        text: `${stale.name} is cut off (${why}). Open its door to join it to the breeze.`,
+      });
+    } else if (sealed) {
+      out.push({
+        tone: "tip",
+        text: `${stale.name} has no open door or window, so no outside air reaches it.`,
       });
     } else {
       out.push({
         tone: "tip",
-        text: `${stale.name} is a dead end (air age ${age}). A fan in its doorway blowing in will stir it up.`,
+        text: `${stale.name} is a dead end (air age ${formatAge(stale.meanAge)}). A fan in its doorway blowing in will stir it up.`,
       });
     }
   }

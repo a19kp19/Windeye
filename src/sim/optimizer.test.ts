@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { TEMPLATES } from "../model/templates";
 import type { Metrics } from "./metrics";
-import { configure, describe as describeCandidate, type OpeningFacts, score, windowSets } from "./optimizer";
+import {
+  benefit,
+  configure,
+  describe as describeCandidate,
+  type OpeningFacts,
+  score,
+  windowSets,
+} from "./optimizer";
 import { rasterize } from "./raster";
 
 function setup() {
@@ -41,6 +48,7 @@ describe("setup finder", () => {
     expect(state("o-k1")).toBe("open");
     expect(state("o-l1")).toBe("closed");
     expect(state("d-hb")).toBe("open");
+    expect(state("d-entry")).toBe("closed"); // front door on the party wall stays shut
     const fan = p.fans.find((f) => f.id === "finder-fan")!;
     expect(fan.on).toBe(true);
     // Blowing out through a north window means pointing plan-up.
@@ -58,11 +66,14 @@ describe("setup finder", () => {
   });
 
   it("prefers a slightly weaker two-window setup over opening everything", () => {
-    const m = (meanAge: number) => ({ home: { meanAge } }) as unknown as Metrics;
+    const m = (meanAge: number) => ({ home: { meanAge, ventilatedShare: 1 } }) as unknown as Metrics;
     const eight = { id: "a", open: ["1", "2", "3", "4", "5", "6", "7", "8"], fan: null, plan: {} as never };
     const two = { id: "b", open: ["1", "2"], fan: null, plan: {} as never };
     expect(score({ kind: "flush" }, m(100), two, {})).toBeGreaterThan(
       score({ kind: "flush" }, m(80), eight, {}),
     );
+    // …while the raw benefit (what "× better than now" reports) still credits the extra air.
+    expect(benefit({ kind: "flush" }, m(80), {})).toBeGreaterThan(benefit({ kind: "flush" }, m(100), {}));
+    expect(benefit({ kind: "flush" }, m(100), {})).toBeCloseTo(36);
   });
 });

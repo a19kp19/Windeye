@@ -25,7 +25,7 @@ const metrics = (over: Partial<Metrics["home"]> = {}, rooms: Metrics["rooms"] = 
   rooms,
   openings: [],
   comfort: [],
-  home: { outdoorAir: 100, volume: 200, ach: 3, meanAge: 600, flushMinutes: 30, ...over },
+  home: { outdoorAir: 100, volume: 200, ach: 3, meanAge: 600, ventilatedShare: 1, flushMinutes: 30, ...over },
 });
 
 describe("advice", () => {
@@ -50,5 +50,28 @@ describe("advice", () => {
     }));
     const a = advise(plan, metrics({ meanAge: 300 }, rooms), s);
     expect(a.some((x) => x.text.startsWith("Kitchen") && /window/.test(x.text))).toBe(true);
+  });
+
+  it("says plainly when no outside air reaches a closed-off room", () => {
+    const { plan, s, r } = summary();
+    const bathIndex = r.rooms.find((x) => /bath/i.test(x.name))!.index;
+    const rooms = r.rooms.map((x) => ({
+      index: x.index,
+      name: x.name,
+      area: x.area,
+      meanAge: x.index === bathIndex ? Number.POSITIVE_INFINITY : 200,
+      ach: x.index === bathIndex ? 0 : 18,
+      fresh: 0.5,
+      meanSpeed: 0.1,
+    }));
+    // Bath window shut as well as its door.
+    const closed = {
+      ...plan,
+      openings: plan.openings.map((o) =>
+        o.id === "o-ba" || o.id === "d-ba" ? { ...o, state: "closed" as const } : o,
+      ),
+    };
+    const tip = advise(closed, metrics({ meanAge: 200 }, rooms), s).find((x) => x.text.startsWith("Bath"));
+    expect(tip?.text).toBe("Bath: no outside air reaches it. Open its window to give it its own supply.");
   });
 });
