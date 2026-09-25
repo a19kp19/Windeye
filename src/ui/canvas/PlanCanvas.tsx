@@ -84,14 +84,19 @@ function hitTest(plan: Plan, p: Vec2, tol: number, selection: Selection | null):
 
 function drawGrid(ctx: CanvasRenderingContext2D, v: View, dpr: number, W: number, H: number) {
   const step = v.scale < 14 ? 5 : 1;
-  const x0 = Math.floor(toPlan(v, { x: 0, y: 0 }).x / step) * step;
-  const y0 = Math.floor(toPlan(v, { x: 0, y: 0 }).y / step) * step;
-  const x1 = toPlan(v, { x: W, y: H }).x;
-  const y1 = toPlan(v, { x: W, y: H }).y;
+  const tl = toPlan(v, { x: 0, y: 0 });
+  const br = toPlan(v, { x: W, y: H });
+  const x0 = Math.floor(tl.x / step) * step;
+  const y0 = Math.floor(tl.y / step) * step;
+  // Count the lines first: far from the origin `x += step` can stop advancing x.
+  const nx = Math.floor((br.x - x0) / step);
+  const ny = Math.floor((br.y - y0) / step);
+  if (!(nx >= 0 && nx < 2000 && ny >= 0 && ny < 2000)) return;
   ctx.save();
   ctx.scale(dpr, dpr);
   ctx.lineWidth = 1;
-  for (let x = x0; x <= x1; x += step) {
+  for (let i = 0; i <= nx; i++) {
+    const x = x0 + i * step;
     const sx = Math.round(x * v.scale + v.ox) + 0.5;
     ctx.strokeStyle = Math.round(x) % 5 === 0 ? "rgba(160,150,130,0.28)" : RULE;
     ctx.beginPath();
@@ -99,7 +104,8 @@ function drawGrid(ctx: CanvasRenderingContext2D, v: View, dpr: number, W: number
     ctx.lineTo(sx, H);
     ctx.stroke();
   }
-  for (let y = y0; y <= y1; y += step) {
+  for (let j = 0; j <= ny; j++) {
+    const y = y0 + j * step;
     const sy = Math.round(y * v.scale + v.oy) + 0.5;
     ctx.strokeStyle = Math.round(y) % 5 === 0 ? "rgba(160,150,130,0.28)" : RULE;
     ctx.beginPath();

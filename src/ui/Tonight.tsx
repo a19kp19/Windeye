@@ -23,7 +23,7 @@ function hourLabel(t: string) {
 function MiniBarb({ speed, from, x, y }: { speed: number; from: number; x: number; y: number }) {
   const kt = speed * 1.944;
   const barbs: React.ReactNode[] = [];
-  let k = Math.round(kt / 5) * 5;
+  let k = Math.round(Math.min(kt, 200) / 5) * 5; // capped so the loop always ends
   let yy = -13;
   while (k >= 10) {
     barbs.push(<line key={yy} x1={0} y1={yy} x2={5} y2={yy - 2.5} />);

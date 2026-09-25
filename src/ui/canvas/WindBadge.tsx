@@ -9,7 +9,8 @@ import { toScreen, type View } from "./view";
 function Barb({ knots }: { knots: number }) {
   const L = 34;
   const els: React.ReactNode[] = [<line key="staff" x1={0} y1={0} x2={0} y2={-L} />];
-  let k = Math.round(knots / 5) * 5;
+  // Capped: for huge values `k -= 50` stops changing k and the loops below never end.
+  let k = Math.round(Math.min(knots, 200) / 5) * 5;
   let y = -L;
   if (k < 5) return <circle r={5} className="calm" />;
   while (k >= 50) {
