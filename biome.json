@@ -10,16 +10,38 @@
     "lineWidth": 110
   },
   "javascript": {
-    "formatter": { "quoteStyle": "double", "trailingCommas": "all", "semicolons": "always" }
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    }
   },
   "linter": {
     "enabled": true,
     "rules": {
       "preset": "recommended",
-      "style": { "noNonNullAssertion": "off", "useTemplate": "off" },
-      "complexity": { "noForEach": "off" },
-      "a11y": { "noSvgWithoutTitle": "off", "noStaticElementInteractions": "off" }
+      "style": {
+        "noNonNullAssertion": "off",
+        "useTemplate": "off",
+        "noDescendingSpecificity": "off"
+      },
+      "complexity": {
+        "noForEach": "off"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "off",
+        "noStaticElementInteractions": "off",
+        "useSemanticElements": "off",
+        "noNoninteractiveElementToInteractiveRole": "off",
+        "noNoninteractiveTabindex": "off"
+      }
     }
   },
-  "assist": { "actions": { "source": { "organizeImports": "on" } } }
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
 }
